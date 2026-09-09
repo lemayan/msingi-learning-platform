@@ -10,6 +10,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
   --font-serif: var(--font-playfair);
+  --font-brand: var(--font-nunito);
+  
+  --color-canvas: #FAF8F5;
 
   /* Primary palette */
   --color-primary-500: #F97316;
@@ -36,7 +39,7 @@
 }
 
 body {
-  background: var(--background);
+  background: var(--color-canvas);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
 }

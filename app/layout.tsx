@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Inter, Playfair_Display, Nunito } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,8 +14,14 @@ const playfairDisplay = Playfair_Display({
   variable: "--font-playfair",
 });
 
+const nunito = Nunito({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-nunito",
+});
+
 export const metadata: Metadata = {
-  title: "Msingi Design System",
+  title: "Msingi",
   description: "A unified design language for the Msingi learning platform. Clean, modern and focused on clarity, consistency and intuitive learning experiences.",
 };
 
@@ -23,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfairDisplay.variable} antialiased`}
+      className={`${inter.variable} ${playfairDisplay.variable} ${nunito.variable} antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
