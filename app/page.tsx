@@ -1,5 +1,6 @@
 import Link from "next/link";
 import React from "react";
+import { SignInButton, SignUpButton, Show, UserButton } from '@clerk/nextjs';
 
 // --- Icons ---
 function MsingiLogo({ size = 24 }: { size?: number }) {
@@ -116,10 +117,19 @@ export default function Home() {
             <button className="text-[#0F172A] hover:text-[#F97316] transition-colors">
               <BellIcon />
             </button>
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-[#E2E8F0] shadow-sm">
-              {/* User avatar placeholder - Cartoon robot instead of human face */}
-              <img src="https://api.dicebear.com/9.x/bottts-neutral/svg?seed=Msingi&backgroundColor=FFEDD5" alt="User" className="w-full h-full object-cover" />
-            </div>
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className="text-sm font-medium text-[#0F172A] hover:text-[#F97316]">Sign In</button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="text-sm font-medium bg-[#F97316] text-white px-4 py-2 rounded-full hover:bg-[#EA580C]">Sign Up</button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <div className="w-8 h-8 rounded-full overflow-hidden shadow-sm flex items-center justify-center">
+                <UserButton />
+              </div>
+            </Show>
           </div>
         </div>
       </nav>
