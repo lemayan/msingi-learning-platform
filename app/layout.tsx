@@ -1,6 +1,8 @@
+import React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Inter, Playfair_Display, Nunito } from "next/font/google";
+import { SanityLive } from "@/sanity/lib/live";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,7 +28,7 @@ export const metadata: Metadata = {
   description: "A unified design language for the Msingi learning platform. Clean, modern and focused on clarity, consistency and intuitive learning experiences.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
@@ -36,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ClerkProvider>
           {children}
         </ClerkProvider>
+        <SanityLive />
       </body>
     </html>
   );
