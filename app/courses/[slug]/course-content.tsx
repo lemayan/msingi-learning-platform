@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import posthog from "posthog-js";
 import { ChevronDownIcon, PlayCircleIcon } from "@/app/components/icons";
 import { formatDuration } from "@/app/lib/format-duration";
 
@@ -35,14 +36,34 @@ export function CourseContent({ courseSlug, modules, totalDuration }: CourseCont
   const visibleModules = showAll ? modules : modules.slice(0, INITIAL_COUNT);
   const hasMore = modules.length > INITIAL_COUNT;
 
-  const toggleModule = (key: string) => {
+  const toggleModule = (key: string, moduleIndex: number, lessonCount: number) => {
     const next = new Set(expandedModules);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
+    const willExpand = !next.has(key);
+
+    if (willExpand) {
       next.add(key);
+    } else {
+      next.delete(key);
     }
+
     setExpandedModules(next);
+    posthog.capture("course_module_toggled", {
+      course_slug: courseSlug,
+      module_key: key,
+      module_index: moduleIndex,
+      lesson_count: lessonCount,
+      expanded: willExpand,
+    });
+  };
+
+  const toggleModuleVisibility = () => {
+    const willShowAll = !showAll;
+    setShowAll(willShowAll);
+    posthog.capture("course_modules_visibility_toggled", {
+      course_slug: courseSlug,
+      module_count: modules.length,
+      showing_all: willShowAll,
+    });
   };
 
   return (
@@ -77,7 +98,9 @@ export function CourseContent({ courseSlug, modules, totalDuration }: CourseCont
               }`}
             >
               <button
-                onClick={() => toggleModule(module._key)}
+                onClick={() =>
+                  toggleModule(module._key, index, module.lessons?.length ?? 0)
+                }
                 className="flex items-center gap-4 px-5 py-4 w-full text-left hover:bg-neutral-50 transition-colors focus:outline-none focus:bg-neutral-50"
               >
                 {/* Module number */}
@@ -117,6 +140,17 @@ export function CourseContent({ courseSlug, modules, totalDuration }: CourseCont
                     <Link
                       key={lesson._id}
                       href={`/courses/${courseSlug}/lessons/${lesson.slug}`}
+                      onClick={() =>
+                        posthog.capture("course_lesson_selected", {
+                          course_slug: courseSlug,
+                          module_key: module._key,
+                          module_index: index,
+                          lesson_id: lesson._id,
+                          lesson_slug: lesson.slug,
+                          lesson_index: lessonIndex,
+                          is_free_preview: lesson.freePreview ?? false,
+                        })
+                      }
                       className="flex items-center gap-3 py-2 px-3 -mx-3 rounded-md hover:bg-white hover:shadow-sm transition-all"
                     >
                       <PlayCircleIcon className="text-neutral-400 w-4 h-4 flex-shrink-0" />
@@ -144,7 +178,7 @@ export function CourseContent({ courseSlug, modules, totalDuration }: CourseCont
       {hasMore && (
         <div className="flex justify-center mt-6">
           <button
-            onClick={() => setShowAll(!showAll)}
+            onClick={toggleModuleVisibility}
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-neutral-700 bg-white border border-neutral-200 rounded-full hover:bg-neutral-50 transition-colors shadow-sm"
           >
             {showAll ? "Show less" : `Show all ${modules.length} modules`}

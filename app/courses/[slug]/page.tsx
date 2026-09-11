@@ -11,14 +11,13 @@ import {
   ClockIcon,
   DocumentIcon,
   UsersIcon,
-  ArrowRightIcon,
-  BookmarkIcon,
   ChevronRightIcon,
   OutcomeIcon,
 } from "@/app/components/icons";
 import { formatDuration } from "@/app/lib/format-duration";
 import { CourseContent } from "./course-content";
 import { ProgressBar } from "./progress-bar";
+import { CourseActions } from "./course-actions";
 
 // ---------------------------------------------------------------------------
 // Types — manual shapes until TypeGen is wired
@@ -243,16 +242,11 @@ export default async function CourseDetailPage({
               </div>
 
               {/* Action buttons */}
-              <div className="flex flex-wrap items-center gap-3">
-                <button className="inline-flex items-center gap-2 bg-primary-500 hover:bg-[#EA580C] text-white text-sm font-medium px-6 py-3 rounded-full transition-colors">
-                  Continue Learning
-                  <ArrowRightIcon className="w-4 h-4" />
-                </button>
-                <button className="inline-flex items-center gap-2 border border-neutral-200 text-neutral-700 text-sm font-medium px-5 py-3 rounded-full hover:bg-neutral-50 transition-colors">
-                  <BookmarkIcon />
-                  Bookmark
-                </button>
-              </div>
+              <CourseActions
+                courseId={course._id}
+                courseSlug={course.slug}
+                courseLevel={course.level}
+              />
             </div>
           </div>
         </section>
@@ -319,7 +313,7 @@ export default async function CourseDetailPage({
       </main>
 
       {/* ── Bottom progress bar (presentational) ───────────────────── */}
-      <ProgressBar />
+      <ProgressBar courseSlug={course.slug} />
     </div>
   );
 }
