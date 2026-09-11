@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import posthog from "posthog-js";
 import { BarChartIcon, ClockIcon, DocumentIcon } from "./icons";
 import { urlFor } from "@/sanity/lib/image";
 import { formatDuration } from "@/app/lib/format-duration";
@@ -46,6 +49,15 @@ export function CourseCard({ course }: { course: CourseCardData }) {
   return (
     <Link
       href={`/courses/${course.slug}`}
+      onClick={() =>
+        posthog.capture("course_selected", {
+          course_id: course._id,
+          course_slug: course.slug,
+          course_level: course.level,
+          is_popular: course.popular ?? false,
+          module_count: moduleCount,
+        })
+      }
       className="flex flex-col bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm hover:shadow-md transition-shadow"
     >
       <div className="w-16 h-16 rounded-[14px] bg-[#0F172A] flex items-center justify-center mb-6 shadow-sm overflow-hidden">

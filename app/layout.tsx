@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Inter, Playfair_Display, Nunito } from "next/font/google";
 import { SanityLive } from "@/sanity/lib/live";
+import { PostHogUserIdentity } from "./components/posthog-user-identity";
 import "./globals.css";
 
 const inter = Inter({
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
+          <PostHogUserIdentity />
           {children}
         </ClerkProvider>
         <SanityLive />

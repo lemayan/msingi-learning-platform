@@ -1,12 +1,13 @@
 "use client";
 
 import { ArrowRightIcon } from "@/app/components/icons";
+import posthog from "posthog-js";
 
 /**
  * Presentational-only sticky progress bar.
  * Displays a static 35% completion. No backend wired (AGENTS.md §7).
  */
-export function ProgressBar() {
+export function ProgressBar({ courseSlug }: { courseSlug: string }) {
   const progress = 0;
 
   return (
@@ -29,7 +30,16 @@ export function ProgressBar() {
         </div>
 
         {/* Right: CTA */}
-        <button className="flex-shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-[#EA580C] text-white text-sm font-medium px-6 py-2.5 rounded-full transition-colors">
+        <button
+          onClick={() =>
+            posthog.capture("course_started", {
+              course_slug: courseSlug,
+              source: "sticky_progress_bar",
+              progress_percent: progress,
+            })
+          }
+          className="flex-shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-[#EA580C] text-white text-sm font-medium px-6 py-2.5 rounded-full transition-colors"
+        >
           Start Course
           <ArrowRightIcon className="w-4 h-4" />
         </button>
