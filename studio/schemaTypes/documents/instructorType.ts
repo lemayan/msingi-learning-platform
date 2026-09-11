@@ -33,9 +33,10 @@ export const instructorType = defineType({
     defineField({
       name: 'expertise',
       title: 'Expertise',
-      description: 'Short tagline — e.g. "Full-Stack Engineer & Educator"',
-      type: 'string',
-      validation: (rule) => rule.max(120),
+      description: 'Short tagline — e.g. ["React", "TypeScript"]',
+      type: 'array',
+      of: [{ type: 'string' }],
+      validation: (rule) => rule.max(8),
     }),
     defineField({
       name: 'bio',
@@ -46,8 +47,15 @@ export const instructorType = defineType({
   preview: {
     select: {
       title: 'name',
-      subtitle: 'expertise',
+      expertise: 'expertise',
       media: 'photo',
     },
+    prepare({ title, expertise, media }) {
+      return {
+        title,
+        subtitle: Array.isArray(expertise) ? expertise.join(', ') : expertise,
+        media,
+      }
+    }
   },
 })

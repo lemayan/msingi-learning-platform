@@ -8,7 +8,10 @@
     "start": "sanity start",
     "deploy": "sanity deploy",
     "deploy-graphql": "sanity graphql deploy",
-    "typegen": "sanity typegen generate"
+    "typegen": "sanity typegen generate",
+    "seed:videos": "node scripts/seeds/resolve-videos.mjs",
+    "seed:build": "node scripts/seeds/build-ndjson.mjs",
+    "seed:import": "sanity dataset import scripts/seeds/seed.ndjson production --replace"
   },
   "dependencies": {
     "@sanity/icons": "^5.2.1",

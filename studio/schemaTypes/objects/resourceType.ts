@@ -22,6 +22,7 @@ export const resourceType = defineType({
           { title: 'Repository', value: 'repo' },
           { title: 'Tool', value: 'tool' },
           { title: 'Documentation', value: 'docs' },
+          { title: 'Link', value: 'link' },
         ],
         layout: 'radio',
       },

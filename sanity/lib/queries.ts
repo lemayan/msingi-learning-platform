@@ -34,9 +34,9 @@ const lessonSummaryFragment = /* groq */ `
   title,
   "slug": slug.current,
   duration,
-  isFreePreview,
+  freePreview,
   studentCount,
-  poster {
+  thumbnail {
     asset->{ _id, url },
     hotspot,
     crop
@@ -64,10 +64,15 @@ export const COURSES_QUERY = defineQuery(/* groq */ `
     },
     level,
     price,
-    isPopular,
+    popular,
     studentCount,
     ${instructorSummaryFragment},
-    ${categorySummaryFragment}
+    ${categorySummaryFragment},
+    modules[] {
+      lessons[]-> {
+        duration
+      }
+    }
   }
 `)
 
@@ -88,7 +93,7 @@ export const COURSE_QUERY = defineQuery(/* groq */ `
     },
     level,
     price,
-    isPopular,
+    popular,
     studentCount,
     learningOutcomes[] {
       _key,
