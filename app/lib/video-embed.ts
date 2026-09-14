@@ -80,3 +80,85 @@ export function getVideoEmbedInfo(
 
   return { provider: "generic", embedUrl: fallbackUrl };
 }
+
+export type VideoProvider = "youtube" | "vimeo" | "bunny";
+
+export interface VideoEmbed {
+  provider: VideoProvider;
+  url: string;
+}
+
+interface EmbedOptions {
+  autoplay?: boolean;
+  startSeconds?: number;
+}
+
+export function buildVideoEmbed(
+  videoUrl: string | null | undefined,
+  options: EmbedOptions = {},
+): VideoEmbed | null {
+  if (!videoUrl) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(videoUrl);
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.replace(/^www\./, "");
+  const start =
+    options.startSeconds && options.startSeconds > 0
+      ? Math.floor(options.startSeconds)
+      : 0;
+  const autoplay = options.autoplay ?? false;
+
+  if (
+    host === "youtube.com" ||
+    host === "m.youtube.com" ||
+    host === "youtu.be" ||
+    host === "youtube-nocookie.com"
+  ) {
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    let id = "";
+    if (host === "youtu.be") id = segments[0] ?? "";
+    else if (segments[0] === "embed" || segments[0] === "shorts")
+      id = segments[1] ?? "";
+    else id = parsed.searchParams.get("v") ?? "";
+    if (!id) return null;
+
+    const params = new URLSearchParams({ rel: "0", modestbranding: "1" });
+    if (start) params.set("start", String(start));
+    if (autoplay) params.set("autoplay", "1");
+    return {
+      provider: "youtube",
+      url: `https://www.youtube.com/embed/${id}?${params.toString()}`,
+    };
+  }
+
+  if (host === "vimeo.com" || host === "player.vimeo.com") {
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const id = host === "player.vimeo.com" ? segments[1] : segments[0];
+    if (!id || !/^\d+$/.test(id)) return null;
+
+    const params = new URLSearchParams();
+    if (autoplay) params.set("autoplay", "1");
+    const query = params.toString();
+    const hash = start ? `#t=${start}s` : "";
+    return {
+      provider: "vimeo",
+      url: `https://player.vimeo.com/video/${id}${query ? `?${query}` : ""}${hash}`,
+    };
+  }
+
+  if (
+    host === "iframe.mediadelivery.net" ||
+    host.endsWith("mediadelivery.net")
+  ) {
+    if (autoplay) parsed.searchParams.set("autoplay", "true");
+    if (start) parsed.searchParams.set("t", String(start));
+    return { provider: "bunny", url: parsed.toString() };
+  }
+
+  return null;
+}
