@@ -138,19 +138,16 @@ export const LESSON_QUERY = defineQuery(/* groq */ `
     title,
     "slug": slug.current,
     videoUrl,
-    poster {
+    thumbnail {
       asset->{ _id, url },
       hotspot,
       crop
     },
     duration,
-    isFreePreview,
+    freePreview,
     studentCount,
     notes,
-    keyPoints[] {
-      _key,
-      text
-    },
+    keyPoints,
     proTip,
     resources[] {
       _key,
@@ -162,21 +159,30 @@ export const LESSON_QUERY = defineQuery(/* groq */ `
     // Derive parent course: find the course whose modules reference this lesson
     "course": *[
       _type == "course" &&
-      references(^._id)
+      references(^._id) &&
+      (!defined($courseSlug) || slug.current == $courseSlug)
     ][0] {
       _id,
       title,
       "slug": slug.current,
+      level,
+      studentCount,
+      coverImage {
+        asset->{ _id, url },
+        hotspot,
+        crop
+      },
       ${instructorSummaryFragment},
       modules[] {
         _key,
         title,
+        summary,
         lessons[]-> {
           _id,
           title,
           "slug": slug.current,
           duration,
-          isFreePreview
+          freePreview
         }
       }
     }
@@ -184,11 +190,63 @@ export const LESSON_QUERY = defineQuery(/* groq */ `
 `)
 
 /**
- * All lesson slugs — used in generateStaticParams.
+ * All lesson slugs grouped by course — used in generateStaticParams for nested route.
  */
 export const LESSON_SLUGS_QUERY = defineQuery(/* groq */ `
-  *[_type == "lesson" && defined(slug.current)] {
-    "slug": slug.current
+  *[_type == "course" && defined(slug.current)] {
+    "courseSlug": slug.current,
+    "lessons": modules[].lessons[]-> {
+      "slug": slug.current
+    }
+  }
+`)
+
+/**
+ * Lessons by IDs — used for structural grounding in search.
+ * Given an array of lesson _ids returned by the search model or query,
+ * reads back authoritative lesson metadata and the parent course with its modules
+ * to compute the derived 5.1 labels.
+ */
+export const LESSONS_BY_IDS_QUERY = defineQuery(/* groq */ `
+  *[_type == "lesson" && _id in $ids] {
+    _id,
+    title,
+    "slug": slug.current,
+    duration,
+    freePreview,
+    studentCount,
+    keyPoints,
+    thumbnail {
+      asset->{ _id, url },
+      hotspot,
+      crop
+    },
+    videoUrl,
+    _createdAt,
+    "course": *[_type == "course" && references(^._id)][0] {
+      _id,
+      title,
+      "slug": slug.current,
+      level,
+      studentCount,
+      coverImage {
+        asset->{ _id, url },
+        hotspot,
+        crop
+      },
+      modules[] {
+        _key,
+        title,
+        summary,
+        lessons[]-> {
+          _id,
+          title,
+          "slug": slug.current,
+          duration,
+          freePreview
+        }
+      }
+    }
   }
 `)
 
