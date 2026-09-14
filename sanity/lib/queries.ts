@@ -138,19 +138,16 @@ export const LESSON_QUERY = defineQuery(/* groq */ `
     title,
     "slug": slug.current,
     videoUrl,
-    poster {
+    "poster": thumbnail {
       asset->{ _id, url },
       hotspot,
       crop
     },
     duration,
-    isFreePreview,
+    "isFreePreview": freePreview,
     studentCount,
     notes,
-    keyPoints[] {
-      _key,
-      text
-    },
+    keyPoints,
     proTip,
     resources[] {
       _key,
@@ -176,7 +173,7 @@ export const LESSON_QUERY = defineQuery(/* groq */ `
           title,
           "slug": slug.current,
           duration,
-          isFreePreview
+          "isFreePreview": freePreview
         }
       }
     }
@@ -189,6 +186,17 @@ export const LESSON_QUERY = defineQuery(/* groq */ `
 export const LESSON_SLUGS_QUERY = defineQuery(/* groq */ `
   *[_type == "lesson" && defined(slug.current)] {
     "slug": slug.current
+  }
+`)
+
+/**
+ * Course + lesson slug pairs — used in generateStaticParams for the nested
+ * lesson route (/courses/[slug]/lessons/[lessonSlug]), which needs both slugs.
+ */
+export const LESSON_PARAMS_QUERY = defineQuery(/* groq */ `
+  *[_type == "course" && defined(slug.current)] {
+    "courseSlug": slug.current,
+    "lessonSlugs": modules[].lessons[]->slug.current
   }
 `)
 
