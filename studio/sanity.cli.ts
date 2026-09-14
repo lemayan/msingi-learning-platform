@@ -18,6 +18,10 @@ export default defineCliConfig({
     projectId: process.env.SANITY_STUDIO_PROJECT_ID,
     dataset: process.env.SANITY_STUDIO_DATASET,
   },
+  studioHost: 'vertex-jsmastery',
+  deployment: {
+    appId: 'y077ia431vhdnioux1v55n14',
+  },
   /**
    * TypeGen: generate types from `defineQuery()` calls in the web app.
    *
