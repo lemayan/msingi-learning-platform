@@ -115,7 +115,7 @@ function buildSearchSystemPrompt(initialContext: string | null): string {
   return `You are the msingi intelligent search agent. Your job is to return relevant, grounded learning results for learner queries.
 
 # Initial Context & Schema Reference
-${initialContext || 'Schema types: course, module, lesson, videoDoc, category, instructor.'}
+${initialContext || 'Schema types: course, module, lesson, video, category, instructor.'}
 
 # Query & Search Rules:
 1. Grounding: Return ONLY real documents found in Sanity. Never hallucinate IDs, titles, or timestamps.
@@ -125,7 +125,7 @@ ${initialContext || 'Schema types: course, module, lesson, videoDoc, category, i
      \`(title match "*a*" || title match "*b*")\` or \`(pt::text(notes) match "*a*" || pt::text(notes) match "*b*")\` or \`(chapters[].label match "*a*" || chapters[].label match "*b*")\`.
      This expands query results across relevant courses (e.g. from 2 to 11 across 4 courses).
 3. Two-Stage Timestamps:
-   - Stage 1: Match chapters (the table of contents) first in videoDoc for clean moment titles and exact startSeconds.
+   - Stage 1: Match chapters (the table of contents) first in video for clean moment titles and exact startSeconds.
    - Stage 2: Fall back to matching transcript chunks only if no chapter matches.
 4. Structural Grounding:
    - You must strictly return ONLY lesson _id strings and video moments. Do not attempt to fabricate full card data.
@@ -158,7 +158,7 @@ async function fallbackGroundedResolution(words: string[], fullPhrase: string): 
       chunks?: Array<{ startSeconds: number; text: string }>
       lesson?: { _id: string; title: string; duration?: number }
     }>>(
-      `*[_type == "videoDoc" && (${videoOrClauses})][0...20] {
+      `*[_type == "video" && (${videoOrClauses})][0...20] {
         _id,
         url,
         chapters,
@@ -291,7 +291,7 @@ export async function executeSearch(req: SearchRequest): Promise<SearchResponse>
         maxRetries: 0,
         tools: {
           groq_query: tool({
-            description: 'Execute a GROQ query against the Sanity dataset to search courses, lessons, and videoDocs.',
+            description: 'Execute a GROQ query against the Sanity dataset to search courses, lessons, and videos.',
             inputSchema: z.object({
               query: z.string().describe('The GROQ query to execute'),
             }),
