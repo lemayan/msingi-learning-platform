@@ -34,6 +34,8 @@ import {
   trackLessonTabSwitched,
 } from "@/app/lib/analytics-client";
 import { useWatchDepth } from "@/hooks/use-watch-depth";
+import { useCourseProgress } from "@/hooks/use-course-progress";
+
 
 export interface SanityImageRef {
   asset?: { _id: string; url: string } | null;
@@ -147,7 +149,17 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
   const [activeTab, setActiveTab] = useState<"content" | "notes">("content");
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [studentNotes, setStudentNotes] = useState("");
-  const [isLessonCompleted, setIsLessonCompleted] = useState(false);
+
+  // Learner course & lesson progress
+  const {
+    progressPercent,
+    isLessonCompleted,
+    isModuleCompleted,
+    toggleLessonCompletion,
+    markLessonCompleted,
+  } = useCourseProgress(course);
+
+  const isCurrentLessonCompleted = isLessonCompleted(lesson._id);
 
   // Video embed info
   const embedInfo = getVideoEmbedInfo(lesson.videoUrl, initialStartSeconds);
@@ -189,7 +201,9 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
     courseSlug: course?.slug || '',
     lessonId: lesson._id,
     lessonTitle: lesson.title,
-    onComplete: () => setIsLessonCompleted(true),
+    onComplete: () => {
+      markLessonCompleted(lesson._id);
+    },
   });
 
   const triggerVideoPlay = useCallback(() => {
@@ -240,7 +254,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
               course_slug: course?.slug || '',
               source: 'watch_threshold',
             });
-            setIsLessonCompleted(true);
+            markLessonCompleted(lesson._id);
           }
         }
       } catch {
@@ -250,12 +264,11 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [lesson._id, lesson.slug, lesson.title, course?.slug, triggerVideoPlay]);
+  }, [lesson._id, lesson.slug, lesson.title, course?.slug, triggerVideoPlay, markLessonCompleted]);
 
-  const handleToggleComplete = () => {
-    const nextState = !isLessonCompleted;
-    setIsLessonCompleted(nextState);
-    if (nextState) {
+  const handleToggleComplete = async () => {
+    const nextCompleted = await toggleLessonCompletion(lesson._id);
+    if (nextCompleted) {
       trackLessonCompleted({
         lesson_id: lesson._id,
         lesson_slug: lesson.slug,
@@ -331,12 +344,12 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
               <div className="flex items-center gap-2 mt-1">
                 <div className="w-24 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#F97316] rounded-full"
-                    style={{ width: "35%" }}
+                    className="h-full bg-[#F97316] rounded-full transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
                   />
                 </div>
                 <span className="text-xs text-[#64748B] font-medium">
-                  35% complete
+                  {progressPercent}% complete
                 </span>
               </div>
             </div>
@@ -358,7 +371,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
           {modules.map((mod, mIdx) => {
             const isCurrentModule = mIdx === currentModuleIndex;
             const isExpanded = expandedModules.has(mod._key);
-            const isCompleted = mIdx < currentModuleIndex;
+            const isCompleted = isModuleCompleted(mod.lessons);
             const moduleDuration =
               mod.lessons?.reduce((sum, l) => sum + (l.duration ?? 0), 0) ?? 0;
 
@@ -380,7 +393,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
                   {/* Module number circle / checkmark */}
                   <div className="flex-shrink-0">
                     {isCompleted ? (
-                      <div className="w-7 h-7 rounded-full border border-[#F97316] flex items-center justify-center text-[#F97316]">
+                      <div className="w-7 h-7 rounded-full border border-[#16A34A] bg-[#DCFCE7] flex items-center justify-center text-[#16A34A]">
                         <CheckCircleIcon className="w-4 h-4" />
                       </div>
                     ) : isCurrentModule ? (
@@ -423,6 +436,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
                   <div className="pl-6 pr-2 py-2 space-y-1 relative before:absolute before:left-6 before:top-2 before:bottom-2 before:w-[1.5px] before:bg-[#E2E8F0]">
                     {mod.lessons.map((l) => {
                       const isCurrentLesson = l.slug === lesson.slug;
+                      const isCompletedLesson = isLessonCompleted(l._id);
 
                       return (
                         <Link
@@ -436,7 +450,11 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
                         >
                           {/* Dot / Indicator on left line */}
                           <div className="absolute left-2.5 top-1/2 -translate-y-1/2">
-                            {isCurrentLesson ? (
+                            {isCompletedLesson ? (
+                              <div className="w-3.5 h-3.5 -ml-[3px] rounded-full bg-[#16A34A] flex items-center justify-center text-white shadow-xs">
+                                <CheckCircleIcon className="w-2.5 h-2.5 stroke-[2.5]" />
+                              </div>
+                            ) : isCurrentLesson ? (
                               <div className="w-2.5 h-2.5 rounded-full bg-[#F97316] ring-4 ring-[#FFEDD5]" />
                             ) : (
                               <div className="w-2 h-2 rounded-full border border-[#CBD5E1] bg-white" />
@@ -445,7 +463,9 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
 
                           {/* Lesson title */}
                           <div className="flex-1 min-w-0 pr-2">
-                            <span className="truncate block">{l.title}</span>
+                            <span className={`truncate block ${isCompletedLesson && !isCurrentLesson ? "text-neutral-700" : ""}`}>
+                              {l.title}
+                            </span>
                             {isCurrentLesson && (
                               <span className="text-[10px] text-[#F97316] font-semibold block uppercase tracking-wider mt-0.5">
                                 Now playing
@@ -459,6 +479,10 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
                               <div className="w-5 h-5 rounded-full bg-[#F97316] flex items-center justify-center text-white">
                                 <PlayCircleIcon className="w-3.5 h-3.5 fill-current" />
                               </div>
+                            ) : isCompletedLesson ? (
+                              <span className="text-[11px] font-medium text-[#16A34A]">
+                                Done
+                              </span>
                             ) : (
                               <span className="text-[11px] text-[#94A3B8]">
                                 {formatDuration(l.duration ?? 0)}
@@ -475,6 +499,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
           })}
         </div>
       </aside>
+
 
       {/* ── Main Content Area ────────────────────────────────────────── */}
       <main className="flex-1 min-w-0 px-6 lg:px-12 py-8 bg-[#FAF8F5]">
@@ -524,14 +549,14 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
                 type="button"
                 onClick={handleToggleComplete}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs ${
-                  isLessonCompleted
+                  isCurrentLessonCompleted
                     ? "bg-[#16A34A] text-white border-[#16A34A]"
                     : "bg-white border-[#E2E8F0] text-[#334155] hover:border-[#CBD5E1] hover:text-[#0F172A]"
                 }`}
-                title={isLessonCompleted ? "Completed! Click to unmark" : "Mark lesson as complete"}
+                title={isCurrentLessonCompleted ? "Completed! Click to unmark" : "Mark lesson as complete"}
               >
                 <CheckCircleIcon className="w-3.5 h-3.5" />
-                <span>{isLessonCompleted ? "Completed" : "Mark Complete"}</span>
+                <span>{isCurrentLessonCompleted ? "Completed" : "Mark Complete"}</span>
               </button>
 
               <button

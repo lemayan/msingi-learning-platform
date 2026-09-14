@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import posthog from "posthog-js";
-import { ChevronDownIcon, PlayCircleIcon } from "@/app/components/icons";
+import { ChevronDownIcon, PlayCircleIcon, CheckCircleIcon } from "@/app/components/icons";
 import { formatDuration } from "@/app/lib/format-duration";
 
 interface Lesson {
@@ -31,6 +31,31 @@ interface CourseContentProps {
 export function CourseContent({ courseSlug, modules, totalDuration }: CourseContentProps) {
   const [showAll, setShowAll] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined" || !courseSlug) return new Set();
+    try {
+      const stored = localStorage.getItem(`msingi_progress_${courseSlug}`);
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch {}
+    return new Set();
+  });
+
+  useEffect(() => {
+    fetch("/api/progress")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.progress) {
+          const s = new Set<string>();
+          for (const [id, r] of Object.entries(data.progress)) {
+            if ((r as { completed?: boolean }).completed) s.add(id);
+          }
+          setCompletedLessonIds((prev) => new Set([...prev, ...s]));
+        }
+      })
+      .catch(() => {});
+  }, [courseSlug]);
 
   const INITIAL_COUNT = 6;
   const visibleModules = showAll ? modules : modules.slice(0, INITIAL_COUNT);
@@ -153,8 +178,12 @@ export function CourseContent({ courseSlug, modules, totalDuration }: CourseCont
                       }
                       className="flex items-center gap-3 py-2 px-3 -mx-3 rounded-md hover:bg-white hover:shadow-sm transition-all"
                     >
-                      <PlayCircleIcon className="text-neutral-400 w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm text-neutral-700 font-medium flex-1">
+                      {completedLessonIds.has(lesson._id) ? (
+                        <CheckCircleIcon className="text-emerald-600 w-4 h-4 flex-shrink-0" />
+                      ) : (
+                        <PlayCircleIcon className="text-neutral-400 w-4 h-4 flex-shrink-0" />
+                      )}
+                      <span className={`text-sm font-medium flex-1 ${completedLessonIds.has(lesson._id) ? "text-neutral-900 font-semibold" : "text-neutral-700"}`}>
                         {index + 1}.{lessonIndex + 1} {lesson.title}
                       </span>
                       {lesson.freePreview && (

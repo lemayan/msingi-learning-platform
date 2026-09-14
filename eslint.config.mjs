@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Standalone Studio — linted separately inside studio/
     "studio/**",
+    // Temporary scratch scripts and skill references
+    "scratch/**",
+    ".agents/**",
+    "agent/**",
   ]),
 ]);
 

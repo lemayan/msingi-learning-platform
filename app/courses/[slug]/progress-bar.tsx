@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowRightIcon } from "@/app/components/icons";
 import { trackCourseResumed } from "@/app/lib/analytics-client";
@@ -7,14 +8,73 @@ import { trackCourseResumed } from "@/app/lib/analytics-client";
 interface ProgressBarProps {
   courseSlug: string;
   firstLessonSlug?: string | null;
+  totalLessons?: number;
 }
 
+const STORAGE_KEY_PREFIX = "msingi_progress_";
+
 /**
- * Presentational-only sticky progress bar.
- * Displays a static 35% completion. No backend wired (AGENTS.md §7).
+ * Bottom sticky progress bar.
+ * Always starts at 0% for a beginner and tracks real learner progress dynamically.
  */
-export function ProgressBar({ courseSlug, firstLessonSlug }: ProgressBarProps) {
-  const progress = 0;
+export function ProgressBar({
+  courseSlug,
+  firstLessonSlug,
+  totalLessons = 0,
+}: ProgressBarProps) {
+  const [progress, setProgress] = useState(() => {
+    if (typeof window === "undefined" || !courseSlug || totalLessons <= 0) return 0;
+    try {
+      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${courseSlug}`);
+      if (stored) {
+        const completedIds: string[] = JSON.parse(stored);
+        if (Array.isArray(completedIds) && totalLessons > 0) {
+          const pct = Math.round((completedIds.length / totalLessons) * 100);
+          return Math.min(100, Math.max(0, pct));
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (!courseSlug) return;
+
+    // Fetch latest from /api/progress for authenticated users
+    let isCancelled = false;
+    fetch("/api/progress")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { progress?: Record<string, { completed: boolean }> } | null) => {
+        if (isCancelled || !data?.progress || totalLessons <= 0) return;
+
+        // Count completed lessons matching local course progress
+        try {
+          const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${courseSlug}`);
+          const localIds = stored ? (JSON.parse(stored) as string[]) : [];
+          const combined = new Set(localIds);
+
+          for (const [id, record] of Object.entries(data.progress)) {
+            if (record.completed) {
+              combined.add(id);
+            }
+          }
+
+          // Count completed that belong to this course
+          const completedCount = combined.size;
+          const pct = Math.round((completedCount / totalLessons) * 100);
+          setProgress(Math.min(100, Math.max(0, pct)));
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [courseSlug, totalLessons]);
 
   const targetHref = firstLessonSlug
     ? `/courses/${courseSlug}/lessons/${firstLessonSlug}`
@@ -40,7 +100,7 @@ export function ProgressBar({ courseSlug, firstLessonSlug }: ProgressBarProps) {
             </span>
             <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden max-w-[240px]">
               <div
-                className="h-full bg-primary-500 rounded-full transition-all"
+                className="h-full bg-primary-500 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
