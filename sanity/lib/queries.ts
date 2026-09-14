@@ -337,3 +337,52 @@ export const CATEGORIES_QUERY = defineQuery(/* groq */ `
     description
   }
 `)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Learner Progress
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all progress records for an authenticated learner.
+ */
+export const LEARNER_PROGRESS_QUERY = defineQuery(/* groq */ `
+  *[_type == "learnerProgress" && userId == $userId] {
+    _id,
+    "lessonId": lesson._ref,
+    completed,
+    resumePosition,
+    updatedAt
+  }
+`)
+
+/**
+ * Fetch all completed lessons with their parent courses for My Learning.
+ */
+export const LEARNER_COURSES_WITH_PROGRESS_QUERY = defineQuery(/* groq */ `
+  *[_type == "learnerProgress" && userId == $userId && completed == true] {
+    "lessonId": lesson._ref,
+    "lesson": lesson-> {
+      _id,
+      title,
+      "slug": slug.current,
+      "course": *[_type == "course" && references(^._id)][0] {
+        _id,
+        title,
+        "slug": slug.current,
+        summary,
+        coverImage {
+          asset->{ _id, url },
+          hotspot,
+          crop
+        },
+        level,
+        modules[] {
+          lessons[]-> {
+            _id
+          }
+        }
+      }
+    }
+  }
+`)
+

@@ -322,8 +322,12 @@ export default async function CourseDetailPage({
         )}
       </main>
 
-      {/* ── Bottom progress bar (presentational) ───────────────────── */}
-      <ProgressBar courseSlug={course.slug} firstLessonSlug={firstLessonSlug} />
+      {/* ── Bottom progress bar ───────────────────── */}
+      <ProgressBar
+        courseSlug={course.slug}
+        firstLessonSlug={firstLessonSlug}
+        totalLessons={course.modules?.reduce((sum, m) => sum + (m.lessons?.length ?? 0), 0) ?? 0}
+      />
     </div>
   );
 }
