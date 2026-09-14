@@ -18,6 +18,7 @@ import { formatDuration } from "@/app/lib/format-duration";
 import { CourseContent } from "./course-content";
 import { ProgressBar } from "./progress-bar";
 import { CourseActions } from "./course-actions";
+import { CourseViewTracker } from "./course-view-tracker";
 
 // ---------------------------------------------------------------------------
 // Types — manual shapes until TypeGen is wired
@@ -149,6 +150,8 @@ export default async function CourseDetailPage({
       0
     ) ?? 0;
   const moduleCount = course.modules?.length ?? 0;
+  const firstLessonSlug =
+    course.modules?.flatMap((m) => m.lessons ?? []).find((l) => Boolean(l?.slug))?.slug ?? null;
 
   // Cover image URL
   const coverImageUrl = course.coverImage?.asset
@@ -158,6 +161,12 @@ export default async function CourseDetailPage({
   return (
     <div className="flex flex-col min-h-screen bg-canvas">
       <Navbar />
+      <CourseViewTracker
+        courseId={course._id}
+        courseSlug={course.slug}
+        courseTitle={course.title}
+        level={course.level}
+      />
 
       <main className="flex-1 pb-20">
         {/* ── Breadcrumb ─────────────────────────────────────────────── */}
@@ -246,6 +255,7 @@ export default async function CourseDetailPage({
                 courseId={course._id}
                 courseSlug={course.slug}
                 courseLevel={course.level}
+                firstLessonSlug={firstLessonSlug}
               />
             </div>
           </div>
@@ -313,7 +323,7 @@ export default async function CourseDetailPage({
       </main>
 
       {/* ── Bottom progress bar (presentational) ───────────────────── */}
-      <ProgressBar courseSlug={course.slug} />
+      <ProgressBar courseSlug={course.slug} firstLessonSlug={firstLessonSlug} />
     </div>
   );
 }

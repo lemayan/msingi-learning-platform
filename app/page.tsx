@@ -36,12 +36,13 @@ export default async function Home() {
           <ArrowRightIcon className="ml-2" />
         </Link>
         
-        <div className="w-full max-w-[640px] relative shadow-md rounded-xl">
+        <form action="/search" method="GET" className="w-full max-w-[640px] relative shadow-md rounded-xl">
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             <SearchIcon className="text-[#64748B]" />
           </div>
           <input 
             type="text" 
+            name="q"
             placeholder="Ask anything about your learning..." 
             className="w-full h-14 pl-12 pr-16 rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#F97316]/20"
           />
@@ -50,7 +51,7 @@ export default async function Home() {
               ⌘ K
             </div>
           </div>
-        </div>
+        </form>
       </section>
 
       {/* 3. Course Catalog Strip */}

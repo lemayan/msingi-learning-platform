@@ -16,10 +16,8 @@ export function PostHogUserIdentity() {
         posthog.reset();
       }
 
-      posthog.identify(user.id, {
-        email: user.primaryEmailAddress?.emailAddress,
-        name: user.fullName ?? undefined,
-      });
+      // Identify by Clerk user ID only — zero personally identifiable information (no email, no name)
+      posthog.identify(user.id);
       identifiedUserId.current = user.id;
       return;
     }

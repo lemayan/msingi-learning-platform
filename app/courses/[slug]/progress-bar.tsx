@@ -1,14 +1,32 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRightIcon } from "@/app/components/icons";
-import posthog from "posthog-js";
+import { trackCourseResumed } from "@/app/lib/analytics-client";
+
+interface ProgressBarProps {
+  courseSlug: string;
+  firstLessonSlug?: string | null;
+}
 
 /**
  * Presentational-only sticky progress bar.
  * Displays a static 35% completion. No backend wired (AGENTS.md §7).
  */
-export function ProgressBar({ courseSlug }: { courseSlug: string }) {
+export function ProgressBar({ courseSlug, firstLessonSlug }: ProgressBarProps) {
   const progress = 0;
+
+  const targetHref = firstLessonSlug
+    ? `/courses/${courseSlug}/lessons/${firstLessonSlug}`
+    : `/courses/${courseSlug}#course-content`;
+
+  const handleContinueLearning = () => {
+    trackCourseResumed({
+      course_slug: courseSlug,
+      location: "sticky_bar",
+      target_lesson_slug: firstLessonSlug || undefined,
+    });
+  };
 
   return (
     <div className="sticky bottom-0 z-40 bg-white border-t border-neutral-200 px-6 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
@@ -30,19 +48,14 @@ export function ProgressBar({ courseSlug }: { courseSlug: string }) {
         </div>
 
         {/* Right: CTA */}
-        <button
-          onClick={() =>
-            posthog.capture("course_started", {
-              course_slug: courseSlug,
-              source: "sticky_progress_bar",
-              progress_percent: progress,
-            })
-          }
+        <Link
+          href={targetHref}
+          onClick={handleContinueLearning}
           className="flex-shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-[#EA580C] text-white text-sm font-medium px-6 py-2.5 rounded-full transition-colors"
         >
-          Start Course
+          Continue Learning
           <ArrowRightIcon className="w-4 h-4" />
-        </button>
+        </Link>
       </div>
     </div>
   );

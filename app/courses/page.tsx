@@ -3,6 +3,7 @@ import { Navbar } from "@/app/components/navbar";
 import { fetchSanity } from "@/sanity/lib/fetch";
 import { COURSES_QUERY } from "@/sanity/lib/queries";
 import { CourseCard, CourseCardData } from "@/app/components/course-card";
+import { CatalogViewTracker } from "./catalog-view-tracker";
 
 export default async function AllCoursesPage() {
   const { data } = await fetchSanity(COURSES_QUERY);
@@ -11,6 +12,7 @@ export default async function AllCoursesPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#FAF8F5]">
       <Navbar />
+      <CatalogViewTracker totalCourses={courses.length} />
 
       <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 py-16">
         {/* Page Header */}
