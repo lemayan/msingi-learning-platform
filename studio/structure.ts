@@ -39,13 +39,13 @@ export const structure: StructureResolver = (S) =>
 
       // ─── Content Pipeline ─────────────────────────────────────────
       S.listItem()
-        .title('Content Pipeline')
+        .title('Video intelligence')
         .icon(PlugIcon)
         .child(
           S.list()
-            .title('Content Pipeline')
+            .title('Video intelligence')
             .items([
-              S.documentTypeListItem('videoDoc')
+              S.documentTypeListItem('video')
                 .title('Video Documents')
                 .icon(PlugIcon),
             ]),

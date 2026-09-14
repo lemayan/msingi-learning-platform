@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import posthog from "posthog-js";
@@ -26,6 +26,14 @@ import { formatDuration } from "@/app/lib/format-duration";
 import { getVideoEmbedInfo } from "@/app/lib/video-embed";
 import { urlFor } from "@/sanity/lib/image";
 import { LessonPortableText } from "./portable-text";
+import {
+  trackVideoPlayed,
+  trackLessonCompleted,
+  trackLessonResumed,
+  trackLessonNavigated,
+  trackLessonTabSwitched,
+} from "@/app/lib/analytics-client";
+import { useWatchDepth } from "@/hooks/use-watch-depth";
 
 export interface SanityImageRef {
   asset?: { _id: string; url: string } | null;
@@ -139,6 +147,10 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
   const [activeTab, setActiveTab] = useState<"content" | "notes">("content");
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [studentNotes, setStudentNotes] = useState("");
+  const [isLessonCompleted, setIsLessonCompleted] = useState(false);
+
+  // Video embed info
+  const embedInfo = getVideoEmbedInfo(lesson.videoUrl, initialStartSeconds);
 
   // Track PostHog analytics on mount
   useEffect(() => {
@@ -154,6 +166,114 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
     });
   }, [lesson._id, lesson.slug, lesson.title, lesson.duration, course?._id, course?.slug, course?.title, initialStartSeconds]);
 
+  // Track Lesson Resumed if entering via deep link with a timestamp
+  useEffect(() => {
+    if (initialStartSeconds && initialStartSeconds > 0) {
+      trackLessonResumed({
+        course_slug: course?.slug || '',
+        lesson_slug: lesson.slug,
+        start_seconds: initialStartSeconds,
+        source: 'deep_link',
+      });
+    }
+  }, [initialStartSeconds, course?.slug, lesson.slug]);
+
+  const hasTrackedPlay = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Measure watch depth via elapsed-time hook (hidden tabs don't count, latched once per mount)
+  useWatchDepth({
+    isPlaying,
+    durationSeconds: lesson.duration ?? 0,
+    lessonSlug: lesson.slug,
+    courseSlug: course?.slug || '',
+    lessonId: lesson._id,
+    lessonTitle: lesson.title,
+    onComplete: () => setIsLessonCompleted(true),
+  });
+
+  const triggerVideoPlay = useCallback(() => {
+    if (!hasTrackedPlay.current) {
+      hasTrackedPlay.current = true;
+      const isDeepLink = Boolean(initialStartSeconds && initialStartSeconds > 0);
+      trackVideoPlayed({
+        provider: embedInfo?.provider || 'youtube',
+        course_slug: course?.slug || '',
+        duration_seconds: lesson.duration ?? 0,
+        source: isDeepLink ? 'deep_link' : 'poster_click',
+        lesson_slug: lesson.slug,
+        lesson_id: lesson._id,
+        lesson_title: lesson.title,
+        start_seconds: initialStartSeconds ?? 0,
+      });
+    }
+  }, [
+    lesson._id,
+    lesson.slug,
+    lesson.title,
+    lesson.duration,
+    course?.slug,
+    initialStartSeconds,
+    embedInfo?.provider,
+  ]);
+
+  // YouTube postMessage event listener for play state updates
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (!data) return;
+
+        if (data.event === 'onStateChange') {
+          // 1 = playing, 2 = paused, 0 = ended
+          if (data.info === 1) {
+            setIsPlaying(true);
+            triggerVideoPlay();
+          } else if (data.info === 2) {
+            setIsPlaying(false);
+          } else if (data.info === 0) {
+            setIsPlaying(false);
+            trackLessonCompleted({
+              lesson_id: lesson._id,
+              lesson_slug: lesson.slug,
+              lesson_title: lesson.title,
+              course_slug: course?.slug || '',
+              source: 'watch_threshold',
+            });
+            setIsLessonCompleted(true);
+          }
+        }
+      } catch {
+        // non-JSON message
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [lesson._id, lesson.slug, lesson.title, course?.slug, triggerVideoPlay]);
+
+  const handleToggleComplete = () => {
+    const nextState = !isLessonCompleted;
+    setIsLessonCompleted(nextState);
+    if (nextState) {
+      trackLessonCompleted({
+        lesson_id: lesson._id,
+        lesson_slug: lesson.slug,
+        lesson_title: lesson.title,
+        course_slug: course?.slug || '',
+        source: 'manual_toggle',
+      });
+    }
+  };
+
+  const handleTabChange = (tab: "content" | "notes") => {
+    setActiveTab(tab);
+    trackLessonTabSwitched({
+      lesson_slug: lesson.slug,
+      tab,
+    });
+  };
+
   const toggleModule = (key: string) => {
     setExpandedModules((prev) => {
       const next = new Set(prev);
@@ -165,9 +285,6 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
       return next;
     });
   };
-
-  // Video embed info
-  const embedInfo = getVideoEmbedInfo(lesson.videoUrl, initialStartSeconds);
 
   // Fallback cover image URL
   const courseCoverUrl = course?.coverImage?.asset
@@ -396,22 +513,38 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
 
         {/* Lesson Header */}
         <div className="mb-6">
-          {/* Badge & Bookmark Row */}
+          {/* Badge & Actions Row */}
           <div className="flex items-center justify-between mb-3">
             <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-[#F97316] bg-[#FFEDD5] px-3 py-1 rounded-md">
               Lesson {currentModuleIndex >= 0 ? `${currentModuleIndex + 1}.${currentLessonIndexInModule + 1}` : "1.1"}
             </span>
 
-            <button
-              type="button"
-              onClick={() => setIsBookmarked(!isBookmarked)}
-              className={`w-9 h-9 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center transition-colors shadow-xs ${
-                isBookmarked ? "text-[#F97316]" : "text-[#64748B] hover:text-[#0F172A]"
-              }`}
-              title={isBookmarked ? "Bookmarked" : "Bookmark this lesson"}
-            >
-              <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleToggleComplete}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs ${
+                  isLessonCompleted
+                    ? "bg-[#16A34A] text-white border-[#16A34A]"
+                    : "bg-white border-[#E2E8F0] text-[#334155] hover:border-[#CBD5E1] hover:text-[#0F172A]"
+                }`}
+                title={isLessonCompleted ? "Completed! Click to unmark" : "Mark lesson as complete"}
+              >
+                <CheckCircleIcon className="w-3.5 h-3.5" />
+                <span>{isLessonCompleted ? "Completed" : "Mark Complete"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsBookmarked(!isBookmarked)}
+                className={`w-9 h-9 rounded-xl border border-[#E2E8F0] bg-white flex items-center justify-center transition-colors shadow-xs ${
+                  isBookmarked ? "text-[#F97316]" : "text-[#64748B] hover:text-[#0F172A]"
+                }`}
+                title={isBookmarked ? "Bookmarked" : "Bookmark this lesson"}
+              >
+                <BookmarkIcon className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
+              </button>
+            </div>
           </div>
 
           {/* Heading */}
@@ -447,7 +580,10 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
         </div>
 
         {/* Video Player Container */}
-        <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg mb-8 relative border border-neutral-900">
+        <div
+          onPointerDown={triggerVideoPlay}
+          className="w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg mb-8 relative border border-neutral-900"
+        >
           {embedInfo?.embedUrl ? (
             <iframe
               src={embedInfo.embedUrl}
@@ -469,7 +605,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
           <div className="flex gap-8">
             <button
               type="button"
-              onClick={() => setActiveTab("content")}
+              onClick={() => handleTabChange("content")}
               className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === "content"
                   ? "text-[#F97316] border-b-2 border-[#F97316]"
@@ -480,7 +616,7 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("notes")}
+              onClick={() => handleTabChange("notes")}
               className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === "notes"
                   ? "text-[#F97316] border-b-2 border-[#F97316]"
@@ -627,6 +763,14 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
             <div className="flex items-center gap-3">
               <Link
                 href={`/courses/${course?.slug}/lessons/${prevItem.lesson.slug}`}
+                onClick={() => {
+                  trackLessonNavigated({
+                    from_lesson_slug: lesson.slug,
+                    to_lesson_slug: prevItem.lesson.slug,
+                    direction: 'prev',
+                    course_slug: course?.slug || '',
+                  });
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-sm font-semibold text-[#0F172A] hover:bg-neutral-50 transition-colors shadow-xs"
               >
                 <ArrowLeftIcon className="w-4 h-4" />
@@ -658,6 +802,14 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
               </div>
               <Link
                 href={`/courses/${course?.slug}/lessons/${nextItem.lesson.slug}`}
+                onClick={() => {
+                  trackLessonNavigated({
+                    from_lesson_slug: lesson.slug,
+                    to_lesson_slug: nextItem.lesson.slug,
+                    direction: 'next',
+                    course_slug: course?.slug || '',
+                  });
+                }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F97316] text-white text-sm font-semibold hover:bg-[#EA580C] transition-colors shadow-xs"
               >
                 <span>Next Lesson</span>
@@ -667,6 +819,15 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
           ) : (
             <Link
               href={course ? `/courses/${course.slug}` : "/courses"}
+              onClick={() => {
+                trackLessonCompleted({
+                  lesson_id: lesson._id,
+                  lesson_slug: lesson.slug,
+                  lesson_title: lesson.title,
+                  course_slug: course?.slug || '',
+                  source: "navigation",
+                });
+              }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F97316] text-white text-sm font-semibold hover:bg-[#EA580C] transition-colors shadow-xs"
             >
               <span>Finish Course</span>
