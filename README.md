@@ -16,7 +16,7 @@
 
 ---
 
-## 🌟 Overview
+## Overview
 
 **msingi** is an AI-powered course platform that pairs rich structured content authoring with intelligent video search. Authors create and organize courses in a standalone Sanity Studio, while a Next.js App Router frontend serves high-performance learning surfaces to students.
 
@@ -24,21 +24,21 @@ What sets **msingi** apart is its search intelligence: learners ask questions in
 
 ---
 
-## ✨ Core Features
+## Core Features
 
-### 🔍 1. Intelligent Natural Language Search
+### 1. Intelligent Natural Language Search
 - **Sanity Context MCP & LLM Reasoning**: Seamlessly queries course content, lesson notes, and timestamped video transcripts using GROQ queries generated dynamically by an LLM (Google Gemini / OpenAI).
 - **Two Result Types**:
   - **Video Moments**: Deep links directly to the specific second (`?start=seconds`) of an embedded video clip with thumbnail, module context, and duration.
   - **Lesson Cards**: Direct access to comprehensive lessons matched on concepts, rich notes, and learning objectives.
 - **Two-Stage Timestamp Resolution**: Matches curated chapter markers first, falling back to granular transcript chunks only when necessary for maximum precision.
 
-### 🎥 2. Frictionless On-Site Video Playback
+### 2. Frictionless On-Site Video Playback
 - Supported video providers: **YouTube**, **Vimeo**, and **Bunny.net**.
 - Providers embed directly on the lesson page with exact timestamp seeking.
 - Learners never get bounced out of the platform to third-party players.
 
-### 📈 3. Dynamic Learner Progress Tracking
+### 3. Dynamic Learner Progress Tracking
 - **0% Beginner Baseline**: New and guest learners always start at **0% complete** across all courses and lessons.
 - **Course & Module Progress**: Dynamic progress percentage calculations:
   $$\text{Progress} = \left\lfloor \frac{\text{Completed Lessons}}{\text{Total Course Lessons}} \times 100 \right\rfloor$$
@@ -50,25 +50,25 @@ What sets **msingi** apart is its search intelligence: learners ask questions in
 - **Robust Persistence**: Keyed by Clerk `userId` through a server route (`/api/progress`) writing to Sanity `learnerProgress` documents, backed by client-side optimistic caching for instant UI updates.
 - **My Learning Surface**: Dynamic dashboard displaying enrolled courses, current progress bars, and resume affordances, with clean beginner onboarding.
 
-### 🔐 4. Authentication & Security Boundaries
+### 4. Authentication & Security Boundaries
 - **Clerk Authentication**: Seamless sign-in and sign-up with Next.js App Router proxy middleware.
 - **Private Dataset Isolation**: Client code never receives Sanity read/write tokens or LLM API keys.
 - **Strict Server Route Architecture**: All progress writes and search queries run exclusively through server-side route handlers.
 
-### 📊 5. Product Analytics & Telemetry
+### 5. Product Analytics & Telemetry
 - **PostHog Client & Server Telemetry**:
   - `catalog_viewed`, `course_selected`, `course_resumed`
   - `lesson_viewed`, `lesson_completed`, `lesson_resumed`
   - `video_played`, `video_progress` (25%, 50%, 75%, 90% watch depth tracking)
   - `search_performed`, `search_result_clicked`
 
-### ⚡ 6. Video Ingestion & Intelligence Pipeline
+### 6. Video Ingestion & Intelligence Pipeline
 - Offline ingest scripts process YouTube and Vimeo caption tracks into short timestamped chunks (`{ startSeconds, text }`) and structured tables of contents (`{ startSeconds, label }`).
 - Keeps heavy transcripts out of user-facing web request paths.
 
 ---
 
-## 🏛 Architecture & Project Structure
+## Architecture & Project Structure
 
 The project is architected as two standalone workspaces in one monorepo to ensure independent deployments, automatic Studio updates, and clean separation of concerns:
 
@@ -111,7 +111,7 @@ msingi/
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Domain | Technology | Purpose |
 |---|---|---|
@@ -127,7 +127,7 @@ msingi/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -209,7 +209,7 @@ cd ..
 
 ---
 
-## 💻 Development Commands
+## Development Commands
 
 | Command | Description |
 |---|---|
@@ -223,7 +223,7 @@ cd ..
 
 ---
 
-## 🧪 Testing & Verification
+## Testing & Verification
 
 Ensure everything is clean before pushing or deploying:
 
@@ -240,7 +240,7 @@ npm run build
 
 ---
 
-## 🔒 Security & Data Integrity Principles
+## Security & Data Integrity Principles
 
 - **No Tokens in the Browser**: The browser client receives neither Sanity API tokens nor LLM keys.
 - **Server Routes for State**: User progress mutations occur exclusively through `/api/progress` verifying Clerk session tokens.
@@ -248,6 +248,6 @@ npm run build
 
 ---
 
-## 📄 License
+## License
 
 Licensed under the [MIT License](LICENSE).
