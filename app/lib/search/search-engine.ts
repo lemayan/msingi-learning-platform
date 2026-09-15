@@ -110,40 +110,54 @@ function deriveModuleAndLessonIndex(
 
 /**
  * Builds the system prompt injecting cached /initial-context and domain search rules.
+ * Shaped following shape-your-agent guidelines.
  */
 function buildSearchSystemPrompt(initialContext: string | null): string {
-  return `You are the msingi intelligent search agent. Your job is to return relevant, grounded learning results for learner queries.
+  return `You are the msingi intelligent search agent, helping learners quickly discover courses, lessons, and exact video moments.
+
+# Role & Purpose
+Help learners find relevant, grounded course content and timestamped video moments across the platform catalog.
 
 # Initial Context & Schema Reference
 ${initialContext || 'Schema types: course, module, lesson, video, category, instructor.'}
 
-# Query & Search Rules:
-1. Grounding: Return ONLY real documents found in Sanity. Never hallucinate IDs, titles, or timestamps.
-2. GROQ Matching (AND vs OR condition):
-   - In GROQ, matching against an array like \`field match ["a", "b"]\` evaluates as an AND condition (both words must be present).
+# Boundaries & Guardrails
+- Grounding: Return ONLY real documents and moments found in Sanity. Never hallucinate IDs, titles, timestamps, or durations.
+- Read-Only: You are a read-only search agent. Never attempt to write or mutate content.
+- Tone: Factual, concise, and direct. Do not mention competitor platforms or external video providers.
+- Output: Strictly call the \`submit_search_results\` tool with \`lessonIds\` and \`videoMoments\`. Do not write conversational prose.
+
+# Two-Stage Timestamp Resolution & Query Rules:
+1. Two-Stage Timestamps:
+   - Stage 1 (Chapters First): Search the video table of contents first (\`chapters[].label\`). If a chapter matches the topic, use its \`startSeconds\`, label, and set \`isChapterMatch: true\`.
+   - Stage 2 (Transcript Fallback): If NO chapter matches, fall back to matching transcript text (\`chunks[].text\`). Use the matched chunk's \`startSeconds\`, snippet, and set \`isChapterMatch: false\`.
+2. Safe Projections:
+   - NEVER query \`{ chunks }\` or \`{ chapters, chunks }\` raw — it will overflow your context window!
+   - Always project filtered slices: \`"matchedChapters": chapters[label match "*keyword*"]\`, \`"matchedChunks": chunks[text match "*keyword*"][0...2]\`.
+3. GROQ Token Matching (AND vs OR):
+   - In GROQ, \`field match ["a", "b"]\` evaluates as an AND condition (both words must be present).
    - To match any keyword (OR semantics), write explicit OR disjunction clauses:
      \`(title match "*a*" || title match "*b*")\` or \`(pt::text(notes) match "*a*" || pt::text(notes) match "*b*")\` or \`(chapters[].label match "*a*" || chapters[].label match "*b*")\`.
-     This expands query results across relevant courses (e.g. from 2 to 11 across 4 courses).
-3. Two-Stage Timestamps:
-   - Stage 1: Match chapters (the table of contents) first in video for clean moment titles and exact startSeconds.
-   - Stage 2: Fall back to matching transcript chunks only if no chapter matches.
-4. Structural Grounding:
-   - You must strictly return ONLY lesson _id strings and video moments. Do not attempt to fabricate full card data.
-   - The application server will hydrate all authoritative card fields directly from Sanity via LESSONS_BY_IDS_QUERY.
+4. Second-Order Relationship:
+   - Videos are linked to lessons by URL / videoId: \`*[_type == "lesson" && (videoUrl == ^.url || videoUrl match ("*" + ^.videoId + "*"))][0]\`.
 5. Final Action:
-   - After querying via groq_query, you MUST call the submit_search_results tool with the final list of lessonIds and videoMoments.`
+   - After querying via \`groq_query\`, you MUST call the \`submit_search_results\` tool with the final list of lessonIds and videoMoments.`
 }
 
 /**
- * Deterministic fallback to find matching lesson IDs and video moments using GROQ disjunction.
- * Used when OpenAI API quota is unavailable or as direct resolver.
+ * Deterministic fallback to find matching lesson IDs and video moments using two-stage timestamp resolution.
+ * Stage 1: Chapters (table of contents) first.
+ * Stage 2: Transcript chunks fallback.
+ * Uses safe projections to avoid context window bloat.
  */
 async function fallbackGroundedResolution(words: string[], fullPhrase: string): Promise<ModelSearchOutput> {
   const lessonOrClauses = words.map(w =>
     `title match "*${w}*" || pt::text(notes) match "*${w}*" || keyPoints match "*${w}*"`
   ).join(' || ')
 
-  const videoOrClauses = words.map(w =>
+  const chapterOrClauses = words.map(w => `label match "*${w}*"`).join(' || ')
+  const chunkOrClauses = words.map(w => `text match "*${w}*"`).join(' || ')
+  const videoFilterClauses = words.map(w =>
     `chapters[].label match "*${w}*" || chunks[].text match "*${w}*"`
   ).join(' || ')
 
@@ -155,15 +169,18 @@ async function fallbackGroundedResolution(words: string[], fullPhrase: string): 
       _id: string
       url: string
       chapters?: Array<{ startSeconds: number; label: string }>
-      chunks?: Array<{ startSeconds: number; text: string }>
+      matchedChapters?: Array<{ startSeconds: number; label: string }>
+      matchedChunks?: Array<{ startSeconds: number; text: string }>
       lesson?: { _id: string; title: string; duration?: number }
     }>>(
-      `*[_type == "video" && (${videoOrClauses})][0...20] {
+      `*[_type == "video" && (${videoFilterClauses})][0...20] {
         _id,
         url,
+        videoId,
         chapters,
-        chunks,
-        "lesson": *[_type == "lesson" && videoUrl == ^.url][0] { _id, title, duration }
+        "matchedChapters": chapters[${chapterOrClauses}],
+        "matchedChunks": chunks[${chunkOrClauses}][0...3],
+        "lesson": *[_type == "lesson" && (videoUrl == ^.url || videoUrl match ("*" + ^.videoId + "*"))][0] { _id, title, duration }
       }`
     ),
   ])
@@ -176,32 +193,46 @@ async function fallbackGroundedResolution(words: string[], fullPhrase: string): 
       if (!doc.lesson?._id) continue
       const lesson = doc.lesson
 
-      // Two-stage timestamp resolution: chapters first, chunks fallback
+      // Two-stage timestamp resolution: Stage 1 = chapters first, Stage 2 = chunks fallback
       let matchedChapter: { startSeconds: number; label: string } | null = null
-      if (doc.chapters && doc.chapters.length > 0) {
-        for (const ch of doc.chapters) {
-          const lbl = (ch.label || '').toLowerCase()
-          if (lbl.includes(fullPhrase) || words.some(w => lbl.includes(w))) {
-            matchedChapter = ch
+      let isChapterMatch = false
+
+      // Stage 1: Match chapters from filtered matchedChapters or chapters array
+      const candidateChapters = (doc.matchedChapters && doc.matchedChapters.length > 0)
+        ? doc.matchedChapters
+        : (doc.chapters || [])
+
+      for (const ch of candidateChapters) {
+        const lbl = (ch.label || '').toLowerCase()
+        if (lbl.includes(fullPhrase) || words.some(w => lbl.includes(w))) {
+          matchedChapter = ch
+          isChapterMatch = true
+          break
+        }
+      }
+
+      // Stage 2: Fallback to transcript chunks ONLY if no chapter matches
+      let matchedChunk: { startSeconds: number; text: string } | null = null
+      if (!matchedChapter && doc.matchedChunks && doc.matchedChunks.length > 0) {
+        for (const ck of doc.matchedChunks) {
+          const txt = (ck.text || '').toLowerCase()
+          if (txt.includes(fullPhrase) || words.some(w => txt.includes(w))) {
+            matchedChunk = ck
+            isChapterMatch = false
             break
           }
         }
       }
 
-      let matchedChunk: { startSeconds: number; text: string } | null = null
-      if (!matchedChapter && doc.chunks && doc.chunks.length > 0) {
-        for (const ck of doc.chunks) {
-          const txt = (ck.text || '').toLowerCase()
-          if (txt.includes(fullPhrase) || words.some(w => txt.includes(w))) {
-            matchedChunk = ck
-            break
-          }
-        }
+      // Default fallback to first chapter if neither explicitly matched
+      if (!matchedChapter && !matchedChunk && doc.chapters && doc.chapters.length > 0) {
+        matchedChapter = doc.chapters[0]
+        isChapterMatch = true
       }
 
       const timestampSeconds = matchedChapter
         ? matchedChapter.startSeconds
-        : (matchedChunk?.startSeconds || doc.chapters?.[0]?.startSeconds || 0)
+        : (matchedChunk?.startSeconds || 0)
 
       const chapterLabel = matchedChapter
         ? matchedChapter.label
@@ -215,6 +246,8 @@ async function fallbackGroundedResolution(words: string[], fullPhrase: string): 
         } else if (lesson.duration) {
           clipDurationSeconds = Math.max(30, lesson.duration * 60 - timestampSeconds)
         }
+      } else if (lesson.duration) {
+        clipDurationSeconds = Math.max(30, lesson.duration * 60 - timestampSeconds)
       }
 
       videoMoments.push({
@@ -222,6 +255,7 @@ async function fallbackGroundedResolution(words: string[], fullPhrase: string): 
         timestampSeconds,
         chapterLabel,
         clipDurationSeconds,
+        isChapterMatch,
       })
     }
   }
@@ -377,8 +411,10 @@ export async function executeSearch(req: SearchRequest): Promise<SearchResponse>
 
     const clipDuration = moment.clipDurationSeconds || 120
     const description = moment.chapterLabel || lesson.title
+    const isChapter = moment.isChapterMatch !== false
 
-    let score = 50
+    // Specificity-based scoring: Chapter match (Stage 1) > transcript chunk match (Stage 2)
+    let score = isChapter ? 60 : 35
     const lowerTitle = lesson.title.toLowerCase()
     if (lowerTitle.includes(fullPhrase)) score += 50
     else if (lowerWords.some((w) => lowerTitle.includes(w))) score += 25
@@ -404,7 +440,7 @@ export async function executeSearch(req: SearchRequest): Promise<SearchResponse>
       clipDurationSeconds: clipDuration,
       clipDurationFormatted: formatClipDuration(clipDuration),
       description,
-      isChapterMatch: Boolean(moment.chapterLabel),
+      isChapterMatch: isChapter,
       score,
     })
   }

@@ -85,21 +85,23 @@ export default async function LessonPage({ params, searchParams }: PageProps) {
     notFound();
   }
 
-  // Parse start timestamp if present in query (?start=45 or ?t=45)
-  const initialStartSeconds = Number(
-    resolvedSearchParams.start ?? resolvedSearchParams.t
-  );
+  // Parse start timestamp if present in query (?start=45, ?start=45s, ?t=45)
+  const rawStart = resolvedSearchParams.start ?? resolvedSearchParams.t;
+  let initialStartSeconds: number | undefined = undefined;
+  if (rawStart !== undefined && rawStart !== null) {
+    const cleaned = String(rawStart).trim().replace(/s$/i, "");
+    const parsed = Number(cleaned);
+    if (!isNaN(parsed) && parsed >= 0) {
+      initialStartSeconds = Math.floor(parsed);
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FAF8F5]">
       <Navbar />
       <LessonView
         lesson={lesson}
-        initialStartSeconds={
-          !isNaN(initialStartSeconds) && initialStartSeconds > 0
-            ? initialStartSeconds
-            : undefined
-        }
+        initialStartSeconds={initialStartSeconds}
       />
     </div>
   );
