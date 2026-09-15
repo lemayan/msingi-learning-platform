@@ -107,6 +107,13 @@ function capitalizeLevel(level: string | null): string {
   return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
+function formatTimestamp(secs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(secs));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
 export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
   const course = lesson.course;
   const modules = course?.modules ?? [];
@@ -607,10 +614,13 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
         {/* Video Player Container */}
         <div
           onPointerDown={triggerVideoPlay}
-          className="w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg mb-8 relative border border-neutral-900"
+          className={`w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg relative border border-neutral-900 ${
+            initialStartSeconds && initialStartSeconds > 0 ? "mb-3" : "mb-8"
+          }`}
         >
           {embedInfo?.embedUrl ? (
             <iframe
+              key={embedInfo.embedUrl}
               src={embedInfo.embedUrl}
               title={lesson.title}
               className="w-full h-full border-0"
@@ -624,6 +634,26 @@ export function LessonView({ lesson, initialStartSeconds }: LessonViewProps) {
             </div>
           )}
         </div>
+
+        {/* Timestamp Seek Banner (when entering via timestamp deep link) */}
+        {initialStartSeconds !== undefined && initialStartSeconds > 0 && (
+          <div className="flex items-center justify-between px-4 py-2.5 mb-8 rounded-xl bg-[#FFF7ED] border border-[#FFEDD5] text-xs text-[#C2410C]">
+            <div className="flex items-center gap-2">
+              <PlayCircleIcon className="w-4 h-4 text-[#F97316] flex-shrink-0" />
+              <span>
+                Playing from matched moment at <strong className="font-mono font-semibold">{formatTimestamp(initialStartSeconds)}</strong>
+              </span>
+            </div>
+            {course && (
+              <Link
+                href={`/courses/${course.slug}/lessons/${lesson.slug}`}
+                className="font-medium text-[#F97316] hover:text-[#EA580C] hover:underline flex-shrink-0"
+              >
+                Play from start
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="border-b border-[#E2E8F0] mb-8">
