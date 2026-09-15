@@ -27,26 +27,30 @@ async function main() {
       _type: "slug",
       current: "search",
     },
-    groqFilter: "_type in [\"course\", \"lesson\", \"category\", \"instructor\", \"video\"]",
-    instructions: `You are the msingi intelligent search agent. Your job is to return relevant, grounded learning results for learner queries.
+    groqFilter: "!(_id in path(\"drafts.**\")) && _type in [\"course\", \"lesson\", \"category\", \"instructor\", \"video\"]",
+    instructions: `### Pure Delta Schema & Relationship Notes
+- Videos link to lessons by URL / videoId: \`*[_type == "lesson" && (videoUrl == ^.url || videoUrl match ("*" + ^.videoId + "*"))][0]\`. There is no direct _ref between them.
+- Courses contain embedded modules with references to lessons (\`modules[].lessons[]._ref\`). Lessons do not store a parent course reference.
+- Match Portable Text notes using plain text projection: \`pt::text(notes) match "*term*"\`.
 
-Content Model:
-- Courses have modules with references to lessons.
-- Lessons have title, notes (portable text), keyPoints (string[]), duration, and videoUrl.
-- Video documents (video) hold chapters ({ startSeconds, label }) and transcript chunks ({ startSeconds, text }).
+### GROQ Query Patterns & Semantics
+- In GROQ, array matching like \`match ["a", "b"]\` evaluates as an AND condition.
+- For keyword search across multiple terms, always write explicit OR disjunction clauses:
+  \`(title match "*term1*" || title match "*term2*") || (pt::text(notes) match "*term1*" || pt::text(notes) match "*term2*")\`
 
-Query & Timestamp Resolution Rules:
-1. Grounding: Never hallucinate courses, lessons, prices, or timestamps. Return ONLY real lesson _id strings found in Sanity.
-2. GROQ Matching (AND vs OR):
-   - In GROQ, matching against an array like \`match ["a", "b"]\` evaluates as an AND condition.
-   - To match any keyword (OR semantics), write explicit OR disjunction clauses.
-3. Two-Stage Timestamps:
-   - Stage 1: Match chapters first for clean moment titles and exact timestamps.
-   - Stage 2: Fall back to matching transcript chunks.
-4. Identification: Return only matching lesson _ids and video timestamps.`
+### Two-Stage Timestamp Resolution
+- Stage 1 (Chapters First): Search the table of contents first (\`chapters[].label\`) for clean moment titles and exact startSeconds.
+- Stage 2 (Transcript Chunks Fallback): If no chapter matches, fall back to matching transcript chunks (\`chunks[].text\`).
+
+### Safety & Projection Rules
+- NEVER query raw \`{ chunks }\` or \`{ chapters, chunks }\` wholesale; transcripts are large and will overflow the context window.
+- Always project filtered slices:
+  \`"matchedChapters": chapters[label match "*keyword*"], "matchedChunks": chunks[text match "*keyword*"][0...2]\`
+- Return strictly grounded results: only real \`lessonIds\` and \`videoMoments\` found in Sanity.`
   };
 
   await sanityMutate([{ createOrReplace: agentContextDoc }]);
   console.log("Updated context document.");
 }
+
 main().catch(console.error);
