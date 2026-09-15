@@ -111,8 +111,8 @@ export const ModelVideoMomentSchema = z.object({
   lessonId: z.string().describe('The Sanity _id of the lesson matching this video moment'),
   timestampSeconds: z.number().describe('The start timestamp in seconds from chapters or transcript chunks'),
   chapterLabel: z.string().nullable().describe('The chapter title or transcript snippet for this moment'),
+  matchSource: z.enum(['chapter', 'transcript', 'unknown']).describe('The authoritative source of the timestamp match'),
   clipDurationSeconds: z.number().nullable().describe('Estimated duration of this video clip in seconds'),
-  isChapterMatch: z.boolean().nullable().describe('True if matched from chapter marker (Stage 1), false if matched from transcript chunk fallback (Stage 2)'),
 })
 
 export const ModelSearchOutputSchema = z.object({

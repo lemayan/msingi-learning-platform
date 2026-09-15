@@ -87,14 +87,15 @@ export default async function LessonPage({ params, searchParams }: PageProps) {
 
   // Parse start timestamp if present in query (?start=45, ?start=45s, ?t=45)
   const rawStart = resolvedSearchParams.start ?? resolvedSearchParams.t;
-  let initialStartSeconds: number | undefined = undefined;
-  if (rawStart !== undefined && rawStart !== null) {
-    const cleaned = String(rawStart).trim().replace(/s$/i, "");
-    const parsed = Number(cleaned);
-    if (!isNaN(parsed) && parsed >= 0) {
-      initialStartSeconds = Math.floor(parsed);
-    }
-  }
+  const parsedStartSeconds = Number(String(rawStart ?? "").trim().replace(/s$/i, ""));
+  const maxStartSeconds =
+    lesson.duration && lesson.duration > 0 ? lesson.duration * 60 : Infinity;
+  const initialStartSeconds =
+    Number.isFinite(parsedStartSeconds) &&
+    parsedStartSeconds >= 0 &&
+    parsedStartSeconds <= maxStartSeconds
+      ? Math.floor(parsedStartSeconds)
+      : undefined;
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FAF8F5]">
