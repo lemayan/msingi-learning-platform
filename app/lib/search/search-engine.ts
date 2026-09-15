@@ -127,6 +127,7 @@ ${initialContext || 'Schema types: course, module, lesson, video, category, inst
 3. Two-Stage Timestamps:
    - Stage 1: Match chapters (the table of contents) first in video for clean moment titles and exact startSeconds.
    - Stage 2: Fall back to matching transcript chunks only if no chapter matches.
+   - Set matchSource to "chapter" only for a confirmed chapter match, "transcript" for a confirmed transcript match, and "unknown" when the source cannot be verified.
 4. Structural Grounding:
    - You must strictly return ONLY lesson _id strings and video moments. Do not attempt to fabricate full card data.
    - The application server will hydrate all authoritative card fields directly from Sanity via LESSONS_BY_IDS_QUERY.
@@ -221,6 +222,7 @@ async function fallbackGroundedResolution(words: string[], fullPhrase: string): 
         lessonId: lesson._id,
         timestampSeconds,
         chapterLabel,
+        matchSource: matchedChapter ? 'chapter' : matchedChunk ? 'transcript' : 'unknown',
         clipDurationSeconds,
       })
     }
@@ -404,7 +406,7 @@ export async function executeSearch(req: SearchRequest): Promise<SearchResponse>
       clipDurationSeconds: clipDuration,
       clipDurationFormatted: formatClipDuration(clipDuration),
       description,
-      isChapterMatch: Boolean(moment.chapterLabel),
+      isChapterMatch: moment.matchSource === 'chapter',
       score,
     })
   }

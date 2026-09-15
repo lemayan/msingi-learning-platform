@@ -86,9 +86,17 @@ export default async function LessonPage({ params, searchParams }: PageProps) {
   }
 
   // Parse start timestamp if present in query (?start=45 or ?t=45)
-  const initialStartSeconds = Number(
+  const parsedStartSeconds = Number(
     resolvedSearchParams.start ?? resolvedSearchParams.t
   );
+  const maxStartSeconds =
+    lesson.duration && lesson.duration > 0 ? lesson.duration * 60 : Infinity;
+  const initialStartSeconds =
+    Number.isFinite(parsedStartSeconds) &&
+    parsedStartSeconds >= 0 &&
+    parsedStartSeconds <= maxStartSeconds
+      ? Math.floor(parsedStartSeconds)
+      : undefined;
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FAF8F5]">
@@ -96,9 +104,7 @@ export default async function LessonPage({ params, searchParams }: PageProps) {
       <LessonView
         lesson={lesson}
         initialStartSeconds={
-          !isNaN(initialStartSeconds) && initialStartSeconds > 0
-            ? initialStartSeconds
-            : undefined
+          initialStartSeconds
         }
       />
     </div>

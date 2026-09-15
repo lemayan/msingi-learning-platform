@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
-const token = process.env.SANITY_API_READ_TOKEN || "skDiML82y8KB2AQgIoH3NBQCJWJEJIaHQ4uIOK8MkTiEu1MlaJIEbNvAJ9zmt72Njdhel2GofRPpaOgPECbzqmKRXa96utMCY9zR0x2t2BPj7qJlLrEeLvYbfTcUkLm8MJ989PkWFJGDgVoIYKeiPJ4Z1t5pkYPBenXaNcNEZOAg81VPwxNR";
+const token = process.env.SANITY_API_READ_TOKEN;
+if (!token) throw new Error("Missing SANITY_API_READ_TOKEN environment variable");
 const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "xyto8u3e";
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || "production";
 
@@ -49,4 +50,3 @@ Query & Timestamp Resolution Rules:
   console.log("Updated context document.");
 }
 main().catch(console.error);
-

@@ -1,4 +1,5 @@
-const token = 'skDiML82y8KB2AQgIoH3NBQCJWJEJIaHQ4uIOK8MkTiEu1MlaJIEbNvAJ9zmt72Njdhel2GofRPpaOgPECbzqmKRXa96utMCY9zR0x2t2BPj7qJlLrEeLvYbfTcUkLm8MJ989PkWFJGDgVoIYKeiPJ4Z1t5pkYPBenXaNcNEZOAg81VPwxNR';
+const token = process.env.SANITY_API_READ_TOKEN;
+if (!token) throw new Error('Missing SANITY_API_READ_TOKEN environment variable');
 const projectId = 'xyto8u3e';
 const dataset = 'production';
 
